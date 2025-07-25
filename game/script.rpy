@@ -51,6 +51,27 @@ default turn_active = True
 # Pour afficher le menu de confirmation après déplacement
 default show_confirm_menu = False
 
+
+
+#ia ryugaru
+
+default moving_ryu = False
+default path_ryu = []
+
+default anim_current_step_ryu = 0
+default anim_start_x_ryu = 0
+default anim_start_y_ryu = 0
+default anim_end_x_ryu = 0
+default anim_end_y_ryu = 0
+
+
+
+
+
+
+
+
+
 ## --- Images ---
 init:
     image background_tile = "images/background_map.png"
@@ -230,6 +251,9 @@ init python:
         turn_active = False
         show_confirm_menu = False
 
+        # Lancer déplacement Ryugaru
+        start_ryugaru_move()
+
 ## --- Screen de confirmation modal ---
 screen confirm_move_menu():
     modal True
@@ -249,8 +273,6 @@ screen confirm_move_menu():
             textbutton "Non" action [Function(cancel_move), Hide("confirm_move_menu")]
 
     timer 5.0 action [Function(cancel_move), Hide("confirm_move_menu")]
-
-## --- Screen combat_screen ---
 screen combat_screen():
     fixed:
         add "background_tile" xpos -camera_x * TILE_SIZE ypos -camera_y * TILE_SIZE xysize (map_width_tiles * TILE_SIZE, map_height_tiles * TILE_SIZE)
@@ -290,12 +312,19 @@ screen combat_screen():
 
         add "hero_sprite" xpos screen_x ypos screen_y size (TILE_SIZE, TILE_SIZE)
 
-        # Ryugaru
-        $ ryu_screen_x = int((ryugaru_tile_x - camera_x) * TILE_SIZE)
-        $ ryu_screen_y = int((ryugaru_tile_y - camera_y) * TILE_SIZE)
+        # Position animée de Ryugaru si en déplacement
+        if moving_ryu:
+            $ interp_x_ryu = anim_start_x_ryu + (anim_end_x_ryu - anim_start_x_ryu) * anim_current_step_ryu / anim_steps
+            $ interp_y_ryu = anim_start_y_ryu + (anim_end_y_ryu - anim_start_y_ryu) * anim_current_step_ryu / anim_steps
+            $ ryu_screen_x = int(interp_x_ryu - camera_x * TILE_SIZE)
+            $ ryu_screen_y = int(interp_y_ryu - camera_y * TILE_SIZE)
+        else:
+            $ ryu_screen_x = int((ryugaru_tile_x - camera_x) * TILE_SIZE)
+            $ ryu_screen_y = int((ryugaru_tile_y - camera_y) * TILE_SIZE)
+
         add "ryugaru_sprite" xpos ryu_screen_x ypos ryu_screen_y size (TILE_SIZE, TILE_SIZE)
 
-        # Debug
+        # Debug info
         frame:
             background "#87CEEB80"
             xpadding 20
@@ -317,7 +346,14 @@ screen combat_screen():
             xpos 10 ypos 90
             text "Moving: [moving]" size 30 color "#000000"
 
-    timer 0.02 repeat True action Function(update_animation)
+        frame:
+            background "#87CEEB80"
+            xpadding 20
+            ypadding 10
+            xpos 10 ypos 130
+            text "Ryugaru Moving: [moving_ryu]" size 30 color "#000000"
+
+    timer 0.02 repeat True action [Function(update_animation), Function(update_animation_ryu)]
 
     # Clic sur héros pour afficher cases mouvables (si pas en déplacement et tour actif)
     button:
@@ -327,10 +363,129 @@ screen combat_screen():
         ysize TILE_SIZE
         background None
         action If(turn_active and not moving, Function(calculate_and_show_moves))
-        # Affiche le menu de confirmation modal quand nécessaire
+
+    # Affiche le menu de confirmation modal quand nécessaire
     if show_confirm_menu:
         use confirm_move_menu
-    
+
+
+
+
+#depalcement ryugaru
+init python:
+
+
+
+    def build_path_from_to(start_x, start_y, target_x, target_y):
+        path = []
+
+        # Horizontal
+        step_x = 1 if target_x > start_x else -1
+        for nx in range(start_x + step_x, target_x + step_x, step_x):
+            path.append((nx, start_y))
+
+        # Vertical
+        step_y = 1 if target_y > start_y else -1
+        for ny in range(start_y + step_y, target_y + step_y, step_y):
+            path.append((target_x, ny))
+
+        return path
+
+
+init python:
+
+    def update_animation_ryu():
+        global anim_current_step_ryu, moving_ryu, ryugaru_tile_x, ryugaru_tile_y
+        global anim_start_x_ryu, anim_start_y_ryu, anim_end_x_ryu, anim_end_y_ryu, path_ryu, ryugaru_dir
+
+        if not moving_ryu:
+            return
+
+        anim_current_step_ryu += 1
+
+        if anim_current_step_ryu >= anim_steps:
+            ryugaru_tile_x = anim_end_x_ryu // TILE_SIZE
+            ryugaru_tile_y = anim_end_y_ryu // TILE_SIZE
+
+            if path_ryu:
+                next_tile = path_ryu.pop(0)
+                nx, ny = next_tile
+
+                dx = nx - ryugaru_tile_x
+                dy = ny - ryugaru_tile_y
+
+                if dx > 0:
+                    ryugaru_dir = "right"
+                elif dx < 0:
+                    ryugaru_dir = "left"
+                elif dy > 0:
+                    ryugaru_dir = "down"
+                elif dy < 0:
+                    ryugaru_dir = "up"
+
+                anim_current_step_ryu = 0
+                anim_start_x_ryu = ryugaru_tile_x * TILE_SIZE
+                anim_start_y_ryu = ryugaru_tile_y * TILE_SIZE
+                anim_end_x_ryu = nx * TILE_SIZE
+                anim_end_y_ryu = ny * TILE_SIZE
+
+            else:
+                moving_ryu = False
+                anim_current_step_ryu = 0
+
+        renpy.restart_interaction()
+    def start_move_ryu(target_x, target_y):
+        global moving_ryu, anim_current_step_ryu, anim_start_x_ryu, anim_start_y_ryu, anim_end_x_ryu, anim_end_y_ryu
+        global ryugaru_dir, ryugaru_tile_x, ryugaru_tile_y, path_ryu
+
+        if moving_ryu:
+            return
+
+        # Utiliser build_path_from_to (4 arguments), pas build_path (2 arguments)
+        path_ryu = build_path_from_to(ryugaru_tile_x, ryugaru_tile_y, target_x, target_y)
+        if not path_ryu:
+            return
+
+        next_tile = path_ryu.pop(0)
+        nx, ny = next_tile
+        dx = nx - ryugaru_tile_x
+        dy = ny - ryugaru_tile_y
+
+        if dx > 0:
+            ryugaru_dir = "right"
+        elif dx < 0:
+            ryugaru_dir = "left"
+        elif dy > 0:
+            ryugaru_dir = "down"
+        elif dy < 0:
+            ryugaru_dir = "up"
+
+        moving_ryu = True
+        anim_current_step_ryu = 0
+        anim_start_x_ryu = ryugaru_tile_x * TILE_SIZE
+        anim_start_y_ryu = ryugaru_tile_y * TILE_SIZE
+        anim_end_x_ryu = nx * TILE_SIZE
+        anim_end_y_ryu = ny * TILE_SIZE
+
+    def start_ryugaru_move():
+        global turn_active
+
+        max_move = 5
+
+        dx = hero_tile_x - ryugaru_tile_x
+        dy = hero_tile_y - ryugaru_tile_y
+
+        # Limite le déplacement de Ryugaru à max_move cases (Manhattan)
+        move_x = max(-max_move, min(dx, max_move))
+        move_y = max(-max_move, min(dy, max_move))
+
+        dest_x = ryugaru_tile_x + move_x
+        dest_y = ryugaru_tile_y + move_y
+
+        start_move_ryu(dest_x, dest_y)  # <-- ici la fonction doit être définie au-dessus
+
+        turn_active = False
+
 
 ## --- Menu démarrage ---
 screen start_menu():

@@ -2,9 +2,9 @@
 errors listed below, and try again.
 
 
-File "game/script.rpy", line 312: 'modal' is not a keyword argument or valid child of the vbox statement.
-    modal True  
-         ^
+File "game/script.rpy", line 437: expected statement.
+    def start_move_ryu(target_x, target_y):
+                      ^
 
 Ren'Py Version: Ren'Py 8.3.7.25031702
-Fri Jul 25 23:55:21 2025
+Sat Jul 26 00:42:16 2025
