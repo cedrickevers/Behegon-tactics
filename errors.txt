@@ -2,14 +2,7 @@
 errors listed below, and try again.
 
 
-File "game/script.rpy", line 118: expected a keyword argument, colon, or end of line.
-    image ryugaru_sprite = ConditionSwitch(
-                         ^
-                "ryugaru_dir == 'down'", "ryugaru_down",
-                "ryugaru_dir == 'up'", "ryugaru_up",
-                "ryugaru_dir == 'left'", "ryugaru_left",
-                "ryugaru_dir == 'right'", "ryugaru_right"
-            )
+File "game/script.rpy", line 99: no binding for nonlocal 'hero_tile_x' found
 
 Ren'Py Version: Ren'Py 8.3.7.25031702
-Fri Jul 25 20:42:32 2025
+Fri Jul 25 21:13:51 2025

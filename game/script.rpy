@@ -9,35 +9,55 @@ define TILE_COUNT_Y = 9
 default map_width_tiles  = 50
 default map_height_tiles = 30
 
-# Yoruah
+# Yoruah (joueur)
 default hero_dir = "down"
 default hero_tile_x = map_width_tiles // 2
 default hero_tile_y = map_height_tiles // 2
 
-# Ryugaru
+# Ryugaru (PNJ)
 default ryugaru_dir = "down"
 default ryugaru_tile_x = 37
 default ryugaru_tile_y = 15
 
+# Caméra centrée sur Yoruah
 default camera_x = max(0, hero_tile_x - TILE_COUNT_X // 2)
 default camera_y = max(0, hero_tile_y - TILE_COUNT_Y // 2)
+
+# Déplacement actif (pour éviter inputs pendant animation)
+default moving = False
+
+# Variables animation déplacement case par case
+default anim_current_step = 0
+define anim_steps = 10
+default anim_start_x = 0
+default anim_start_y = 0
+default anim_end_x = 0
+default anim_end_y = 0
+
+# Pour sélection des cases mouvables
+default selected_tile = None
+default movable_tiles = []
+
+# Liste des cases sur le chemin à parcourir (liste de tuples)
+default path = []
 
 ## --- Images ---
 init:
     image background_tile = "images/background_map.png"
 
-    # Yoruah sprites
+    # Sprites Yoruah
     image yoruah_down   = "images/yoruah/yoruah_down.png"
     image yoruah_up     = "images/yoruah/yoruah_up.png"
     image yoruah_left   = "images/yoruah/yoruah_left.png"
     image yoruah_right  = "images/yoruah/yoruah_right.png"
 
-    # Ryugaru sprites
+    # Sprites Ryugaru
     image ryugaru_down   = "images/ryugaru/ryugaru_down.png"
     image ryugaru_up     = "images/ryugaru/ryugaru_up.png"
     image ryugaru_left   = "images/ryugaru/ryugaru_left.png"
     image ryugaru_right  = "images/ryugaru/ryugaru_right.png"
 
+    # Sprite Yoruah selon direction
     image hero_sprite = ConditionSwitch(
         "hero_dir == 'down'",  "yoruah_down",
         "hero_dir == 'up'",    "yoruah_up",
@@ -45,6 +65,7 @@ init:
         "hero_dir == 'right'", "yoruah_right"
     )
 
+    # Sprite Ryugaru selon direction
     image ryugaru_sprite = ConditionSwitch(
         "ryugaru_dir == 'down'", "ryugaru_down",
         "ryugaru_dir == 'up'", "ryugaru_up",
@@ -52,64 +73,208 @@ init:
         "ryugaru_dir == 'right'", "ryugaru_right"
     )
 
-## --- Fonction mise à jour caméra ---
+## --- Fonctions ---
 init python:
+    import renpy.exports as renpy
+
     def update_camera():
         global camera_x, camera_y
-
         camera_x = max(0, min(map_width_tiles - TILE_COUNT_X, hero_tile_x - TILE_COUNT_X // 2))
         camera_y = max(0, min(map_height_tiles - TILE_COUNT_Y, hero_tile_y - TILE_COUNT_Y // 2))
 
-## --- Fonction déplacer héros ---
-init python:
-    def move_hero(dx, dy):
-        global hero_tile_x, hero_tile_y, hero_dir
-        new_x = hero_tile_x + dx
-        new_y = hero_tile_y + dy
+    def calculate_movable_tiles(radius=5):
+        tiles = []
+        for dx in range(-radius, radius+1):
+            for dy in range(-radius, radius+1):
+                tx = hero_tile_x + dx
+                ty = hero_tile_y + dy
+                if 0 <= tx < map_width_tiles and 0 <= ty < map_height_tiles:
+                    tiles.append((tx, ty))
+        return tiles
 
-        # Limite dans la map
-        if 0 <= new_x < map_width_tiles and 0 <= new_y < map_height_tiles:
-            hero_tile_x = new_x
-            hero_tile_y = new_y
+    def calculate_and_show_moves():
+        global movable_tiles
+        movable_tiles = calculate_movable_tiles(5)
 
-            # Mise à jour direction
-            if dx == 1:
-                hero_dir = "right"
-            elif dx == -1:
-                hero_dir = "left"
-            elif dy == 1:
-                hero_dir = "down"
-            elif dy == -1:
-                hero_dir = "up"
+    def build_path(target_x, target_y):
+        """Construit un chemin simple en ligne droite: d'abord horizontal, puis vertical."""
+        path = []
+        x, y = hero_tile_x, hero_tile_y
 
-            # Met à jour la caméra après déplacement
-            update_camera()
+        # Horizontal
+        step_x = 1 if target_x > x else -1
+        for nx in range(x + step_x, target_x + step_x, step_x):
+            path.append( (nx, y) )
 
-## --- Fonction déplacer Ryugaru ---
-init python:
-    def move_ryugaru(dx, dy):
-        global ryugaru_tile_x, ryugaru_tile_y, ryugaru_dir
-        new_x = ryugaru_tile_x + dx
-        new_y = ryugaru_tile_y + dy
+        # Vertical
+        step_y = 1 if target_y > y else -1
+        for ny in range(y + step_y, target_y + step_y, step_y):
+            path.append( (target_x, ny) )
 
-        # Limite dans la map
-        if 0 <= new_x < map_width_tiles and 0 <= new_y < map_height_tiles:
-            ryugaru_tile_x = new_x
-            ryugaru_tile_y = new_y
+        return path
 
-            # Mise à jour direction
-            if dx == 1:
-                ryugaru_dir = "right"
-            elif dx == -1:
-                ryugaru_dir = "left"
-            elif dy == 1:
-                ryugaru_dir = "down"
-            elif dy == -1:
-                ryugaru_dir = "up"
+    def start_move_to(target_x, target_y):
+        global moving, anim_current_step, anim_start_x, anim_start_y, anim_end_x, anim_end_y
+        global hero_dir, selected_tile, movable_tiles, hero_tile_x, hero_tile_y, path
 
-            # Optionnel : ne pas bouger la caméra ici pour suivre Yoruah uniquement
+        if moving:
+            return
 
-## --- Menu de démarrage ---
+        if (target_x, target_y) not in movable_tiles:
+            return
+
+        path = build_path(target_x, target_y)
+        if not path:
+            return
+
+        # Démarrer la première étape de déplacement
+        next_tile = path.pop(0)
+        nx, ny = next_tile
+        dx = nx - hero_tile_x
+        dy = ny - hero_tile_y
+
+        if dx > 0:
+            hero_dir = "right"
+        elif dx < 0:
+            hero_dir = "left"
+        elif dy > 0:
+            hero_dir = "down"
+        elif dy < 0:
+            hero_dir = "up"
+
+        moving = True
+        anim_current_step = 0
+        anim_start_x = hero_tile_x * TILE_SIZE
+        anim_start_y = hero_tile_y * TILE_SIZE
+        anim_end_x = nx * TILE_SIZE
+        anim_end_y = ny * TILE_SIZE
+
+        selected_tile = None
+        movable_tiles = []
+
+    def update_animation():
+        global anim_current_step, moving, hero_tile_x, hero_tile_y, camera_x, camera_y
+        global anim_start_x, anim_start_y, anim_end_x, anim_end_y, path, hero_dir
+
+        if not moving:
+            return
+
+        anim_current_step += 1
+
+        if anim_current_step >= anim_steps:
+            # Fin d'une étape
+            hero_tile_x = anim_end_x // TILE_SIZE
+            hero_tile_y = anim_end_y // TILE_SIZE
+
+            if path:
+                # Prochaine case dans le chemin
+                next_tile = path.pop(0)
+                nx, ny = next_tile
+
+                dx = nx - hero_tile_x
+                dy = ny - hero_tile_y
+
+                if dx > 0:
+                    hero_dir = "right"
+                elif dx < 0:
+                    hero_dir = "left"
+                elif dy > 0:
+                    hero_dir = "down"
+                elif dy < 0:
+                    hero_dir = "up"
+
+                anim_current_step = 0
+                anim_start_x = hero_tile_x * TILE_SIZE
+                anim_start_y = hero_tile_y * TILE_SIZE
+                anim_end_x = nx * TILE_SIZE
+                anim_end_y = ny * TILE_SIZE
+
+            else:
+                # Fin du déplacement complet
+                update_camera()
+                moving = False
+                anim_current_step = 0
+
+        renpy.restart_interaction()
+
+## --- Screen combat_screen ---
+screen combat_screen():
+    fixed:
+        add "background_tile" xpos -camera_x * TILE_SIZE ypos -camera_y * TILE_SIZE xysize (map_width_tiles * TILE_SIZE, map_height_tiles * TILE_SIZE)
+
+        # Grille visible
+        for x in range(TILE_COUNT_X + 1):
+            for y in range(TILE_COUNT_Y + 1):
+                $ tile_x = int(camera_x) + x
+                $ tile_y = int(camera_y) + y
+                if tile_x < map_width_tiles and tile_y < map_height_tiles:
+                    add "images/grid.png" xpos x * TILE_SIZE ypos y * TILE_SIZE
+
+        # Surlignage des cases accessibles si sélection en cours
+        for (tx, ty) in movable_tiles:
+            $ screen_x = int((tx - camera_x) * TILE_SIZE)
+            $ screen_y = int((ty - camera_y) * TILE_SIZE)
+            add Solid("#55FF0055") xpos screen_x ypos screen_y xsize TILE_SIZE ysize TILE_SIZE
+
+            button:
+                xpos screen_x
+                ypos screen_y
+                xsize TILE_SIZE
+                ysize TILE_SIZE
+                action Function(start_move_to, tx, ty)
+                background None
+
+        # Position animée du héros si en déplacement
+        if moving:
+            $ interp_x = anim_start_x + (anim_end_x - anim_start_x) * anim_current_step / anim_steps
+            $ interp_y = anim_start_y + (anim_end_y - anim_start_y) * anim_current_step / anim_steps
+            $ screen_x = int(interp_x - camera_x * TILE_SIZE)
+            $ screen_y = int(interp_y - camera_y * TILE_SIZE)
+        else:
+            $ screen_x = int((hero_tile_x - camera_x) * TILE_SIZE)
+            $ screen_y = int((hero_tile_y - camera_y) * TILE_SIZE)
+
+        add "hero_sprite" xpos screen_x ypos screen_y size (TILE_SIZE, TILE_SIZE)
+
+        # Ryugaru
+        $ ryu_screen_x = int((ryugaru_tile_x - camera_x) * TILE_SIZE)
+        $ ryu_screen_y = int((ryugaru_tile_y - camera_y) * TILE_SIZE)
+        add "ryugaru_sprite" xpos ryu_screen_x ypos ryu_screen_y size (TILE_SIZE, TILE_SIZE)
+
+        # Debug
+        frame:
+            background "#87CEEB80"
+            xpadding 20
+            ypadding 10
+            xpos 10 ypos 10
+            text "Hero Pos: ([hero_tile_x], [hero_tile_y])" size 30 color "#000000"
+
+        frame:
+            background "#87CEEB80"
+            xpadding 20
+            ypadding 10
+            xpos 10 ypos 50
+            text "Hero Dir: [hero_dir]" size 30 color "#000000"
+
+        frame:
+            background "#87CEEB80"
+            xpadding 20
+            ypadding 10
+            xpos 10 ypos 90
+            text "Moving: [moving]" size 30 color "#000000"
+
+    timer 0.02 repeat True action Function(update_animation)
+
+    # Clic sur héros pour afficher cases mouvables (si pas en déplacement)
+    button:
+        xpos int((hero_tile_x - camera_x) * TILE_SIZE)
+        ypos int((hero_tile_y - camera_y) * TILE_SIZE)
+        xsize TILE_SIZE
+        ysize TILE_SIZE
+        background None
+        action If(moving == False, Function(calculate_and_show_moves))
+
+## --- Menu démarrage ---
 screen start_menu():
     tag menu
     frame:
@@ -122,102 +287,6 @@ screen start_menu():
         textbutton "Combat" action Jump("combat")
         textbutton "Déplacement" action Jump("deplacement")
 
-## --- Écran combat ---
-screen combat_screen():
-    fixed:
-        # Fond
-        add "background_tile" xpos -camera_x * TILE_SIZE ypos -camera_y * TILE_SIZE xysize (map_width_tiles * TILE_SIZE, map_height_tiles * TILE_SIZE)
-
-        # Grille visible
-        for x in range(TILE_COUNT_X + 1):
-            for y in range(TILE_COUNT_Y + 1):
-                $ tile_x = camera_x + x
-                $ tile_y = camera_y + y
-
-                if tile_x < map_width_tiles and tile_y < map_height_tiles:
-                    add "images/grid.png" xpos x * TILE_SIZE ypos y * TILE_SIZE
-
-        # Yoruah au centre
-        $ screen_x = (TILE_COUNT_X // 2) * TILE_SIZE
-        $ screen_y = (TILE_COUNT_Y // 2) * TILE_SIZE
-        add "hero_sprite" xpos screen_x ypos screen_y size (TILE_SIZE, TILE_SIZE)
-
-        # Ryugaru selon position relative à caméra
-        $ ryu_screen_x = (ryugaru_tile_x - camera_x) * TILE_SIZE
-        $ ryu_screen_y = (ryugaru_tile_y - camera_y) * TILE_SIZE
-        add "ryugaru_sprite" xpos ryu_screen_x ypos ryu_screen_y size (TILE_SIZE, TILE_SIZE)
-
-        # Debug info
-        frame:
-            background "#87CEEB80"
-            xpadding 20
-            ypadding 10
-            xpos 10
-            ypos 70
-            text "Hero Pos: ([hero_tile_x], [hero_tile_y])" size 40 color "#000000"
-
-        frame:
-            background "#87CEEB80"
-            xpadding 20
-            ypadding 10
-            xpos 10
-            ypos 130
-            text "Hero Dir: [hero_dir]" size 40 color "#000000"
-
-    key "K_UP" action Function(move_hero, 0, -1)
-    key "K_DOWN" action Function(move_hero, 0, 1)
-    key "K_LEFT" action Function(move_hero, -1, 0)
-    key "K_RIGHT" action Function(move_hero, 1, 0)
-    key "K_ESCAPE" action Return()
-
-## --- Écran déplacement (backup) ---
-screen deplacement_screen():
-    fixed:
-        # Fond
-        add "background_tile" xpos -camera_x * TILE_SIZE ypos -camera_y * TILE_SIZE xysize (map_width_tiles * TILE_SIZE, map_height_tiles * TILE_SIZE)
-
-        # Grille visible
-        for x in range(TILE_COUNT_X + 1):
-            for y in range(TILE_COUNT_Y + 1):
-                $ tile_x = camera_x + x
-                $ tile_y = camera_y + y
-
-                if tile_x < map_width_tiles and tile_y < map_height_tiles:
-                    add "images/grid.png" xpos x * TILE_SIZE ypos y * TILE_SIZE
-
-        # Yoruah au centre
-        $ screen_x = (TILE_COUNT_X // 2) * TILE_SIZE
-        $ screen_y = (TILE_COUNT_Y // 2) * TILE_SIZE
-        add "hero_sprite" xpos screen_x ypos screen_y size (TILE_SIZE, TILE_SIZE)
-
-        # Ryugaru selon position relative à caméra
-        $ ryu_screen_x = (ryugaru_tile_x - camera_x) * TILE_SIZE
-        $ ryu_screen_y = (ryugaru_tile_y - camera_y) * TILE_SIZE
-        add "ryugaru_sprite" xpos ryu_screen_x ypos ryu_screen_y size (TILE_SIZE, TILE_SIZE)
-
-        # Debug info
-        frame:
-            background "#87CEEB80"
-            xpadding 20
-            ypadding 10
-            xpos 10
-            ypos 70
-            text "Hero Pos: ([hero_tile_x], [hero_tile_y])" size 40 color "#000000"
-
-        frame:
-            background "#87CEEB80"
-            xpadding 20
-            ypadding 10
-            xpos 10
-            ypos 130
-            text "Hero Dir: [hero_dir]" size 40 color "#000000"
-
-    key "K_UP" action Function(move_hero, 0, -1)
-    key "K_DOWN" action Function(move_hero, 0, 1)
-    key "K_LEFT" action Function(move_hero, -1, 0)
-    key "K_RIGHT" action Function(move_hero, 1, 0)
-    key "K_ESCAPE" action Return()
-
 ## --- Labels ---
 label start:
     call screen start_menu
@@ -228,5 +297,5 @@ label combat:
     return
 
 label deplacement:
-    call screen deplacement_screen
+    call screen combat_screen
     return
