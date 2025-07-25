@@ -2,7 +2,9 @@
 errors listed below, and try again.
 
 
-File "game/script.rpy", line 99: no binding for nonlocal 'hero_tile_x' found
+File "game/script.rpy", line 312: 'modal' is not a keyword argument or valid child of the vbox statement.
+    modal True  
+         ^
 
 Ren'Py Version: Ren'Py 8.3.7.25031702
-Fri Jul 25 21:13:51 2025
+Fri Jul 25 23:55:21 2025

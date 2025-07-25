@@ -1,74 +1,28 @@
 ﻿I'm sorry, but an uncaught exception occurred.
 
 While running game code:
-  File "game/script.rpy", line 164, in script
-    call screen combat_screen
-  File "renpy/common/000statements.rpy", line 671, in execute_call_screen
-    store._return = renpy.call_screen(name, *args, **kwargs)
-  File "game/script.rpy", line 56, in execute
-    screen combat_screen():
-  File "game/script.rpy", line 56, in execute
-    screen combat_screen():
-  File "game/script.rpy", line 57, in execute
-    fixed:
-  File "game/script.rpy", line 59, in execute
-    add "background_tile" xpos -camera_x * TILE_SIZE ypos -camera_y * TILE_SIZE xysize (map_width_tiles * TILE_SIZE, map_height_tiles * TILE_SIZE)
-  File "game/script.rpy", line 59, in keywords
-    add "background_tile" xpos -camera_x * TILE_SIZE ypos -camera_y * TILE_SIZE xysize (map_width_tiles * TILE_SIZE, map_height_tiles * TILE_SIZE)
-  File "game/script.rpy", line 59, in <module>
-    add "background_tile" xpos -camera_x * TILE_SIZE ypos -camera_y * TILE_SIZE xysize (map_width_tiles * TILE_SIZE, map_height_tiles * TILE_SIZE)
-NameError: name 'TILE_SIZE' is not defined
+  File "renpy/common/00start.rpy", line 282, in script
+    python:
+ScriptError: could not find label 'start'.
 
 -- Full Traceback ------------------------------------------------------------
 
 Full traceback:
-  File "game/script.rpy", line 164, in script
-    call screen combat_screen
-  File "D:\renpy-8.3.7-sdk\renpy\ast.py", line 1987, in execute
-    self.call("execute")
-  File "D:\renpy-8.3.7-sdk\renpy\ast.py", line 1966, in call
-    return renpy.statements.call(method, parsed, *args, **kwargs)
-  File "D:\renpy-8.3.7-sdk\renpy\statements.py", line 374, in call
-    return method(parsed, *args, **kwargs)
-  File "renpy/common/000statements.rpy", line 671, in execute_call_screen
-    store._return = renpy.call_screen(name, *args, **kwargs)
-  File "D:\renpy-8.3.7-sdk\renpy\exports\statementexports.py", line 345, in call_screen
-    rv = renpy.ui.interact(mouse="screen", type="screen", roll_forward=roll_forward)
-  File "D:\renpy-8.3.7-sdk\renpy\ui.py", line 301, in interact
-    rv = renpy.game.interface.interact(roll_forward=roll_forward, **kwargs)
-  File "D:\renpy-8.3.7-sdk\renpy\display\core.py", line 2218, in interact
-    repeat, rv = self.interact_core(preloads=preloads, trans_pause=trans_pause, pause=pause, pause_start=pause_start, pause_modal=pause_modal, **kwargs) # type: ignore
-  File "D:\renpy-8.3.7-sdk\renpy\display\core.py", line 2748, in interact_core
-    root_widget.visit_all(lambda d : d.per_interact())
-  File "D:\renpy-8.3.7-sdk\renpy\display\displayable.py", line 434, in visit_all
-    d.visit_all(callback, seen)
-  File "D:\renpy-8.3.7-sdk\renpy\display\displayable.py", line 434, in visit_all
-    d.visit_all(callback, seen)
-  File "D:\renpy-8.3.7-sdk\renpy\display\displayable.py", line 434, in visit_all
-    d.visit_all(callback, seen)
-  File "D:\renpy-8.3.7-sdk\renpy\display\screen.py", line 480, in visit_all
-    callback(self)
-  File "D:\renpy-8.3.7-sdk\renpy\display\core.py", line 2748, in <lambda>
-    root_widget.visit_all(lambda d : d.per_interact())
-  File "D:\renpy-8.3.7-sdk\renpy\display\screen.py", line 491, in per_interact
-    self.update()
-  File "D:\renpy-8.3.7-sdk\renpy\display\screen.py", line 700, in update
-    self.screen.function(**self.scope)
-  File "game/script.rpy", line 56, in execute
-    screen combat_screen():
-  File "game/script.rpy", line 56, in execute
-    screen combat_screen():
-  File "game/script.rpy", line 57, in execute
-    fixed:
-  File "game/script.rpy", line 59, in execute
-    add "background_tile" xpos -camera_x * TILE_SIZE ypos -camera_y * TILE_SIZE xysize (map_width_tiles * TILE_SIZE, map_height_tiles * TILE_SIZE)
-  File "game/script.rpy", line 59, in keywords
-    add "background_tile" xpos -camera_x * TILE_SIZE ypos -camera_y * TILE_SIZE xysize (map_width_tiles * TILE_SIZE, map_height_tiles * TILE_SIZE)
-  File "game/script.rpy", line 59, in <module>
-    add "background_tile" xpos -camera_x * TILE_SIZE ypos -camera_y * TILE_SIZE xysize (map_width_tiles * TILE_SIZE, map_height_tiles * TILE_SIZE)
-NameError: name 'TILE_SIZE' is not defined
+  File "D:\renpy-8.3.7-sdk\renpy\bootstrap.py", line 359, in bootstrap
+    renpy.main.main()
+  File "D:\renpy-8.3.7-sdk\renpy\main.py", line 652, in main
+    run(restart)
+  File "D:\renpy-8.3.7-sdk\renpy\main.py", line 148, in run
+    renpy.execution.run_context(True)
+  File "D:\renpy-8.3.7-sdk\renpy\execution.py", line 958, in run_context
+    context.run()
+  File "renpy/common/00start.rpy", line 282, in script
+    python:
+  File "D:\renpy-8.3.7-sdk\renpy\script.py", line 1103, in lookup
+    raise ScriptError("could not find label '%s'." % str(original))
+ScriptError: could not find label 'start'.
 
 Windows-10-10.0.19045 AMD64
 Ren'Py 8.3.7.25031702
 Behegon tactics 1.0
-Fri Jul 25 22:08:24 2025
+Sat Jul 26 00:05:00 2025

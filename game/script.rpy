@@ -14,6 +14,10 @@ default hero_dir = "down"
 default hero_tile_x = map_width_tiles // 2
 default hero_tile_y = map_height_tiles // 2
 
+# Position de départ avant déplacement (pour annulation)
+default hero_start_x = hero_tile_x
+default hero_start_y = hero_tile_y
+
 # Ryugaru (PNJ)
 default ryugaru_dir = "down"
 default ryugaru_tile_x = 37
@@ -40,6 +44,12 @@ default movable_tiles = []
 
 # Liste des cases sur le chemin à parcourir (liste de tuples)
 default path = []
+
+# Etat du tour : True = déplacement possible, False = tour fini, plus de déplacements
+default turn_active = True
+
+# Pour afficher le menu de confirmation après déplacement
+default show_confirm_menu = False
 
 ## --- Images ---
 init:
@@ -94,7 +104,8 @@ init python:
 
     def calculate_and_show_moves():
         global movable_tiles
-        movable_tiles = calculate_movable_tiles(5)
+        if turn_active and not moving:
+            movable_tiles = calculate_movable_tiles(5)
 
     def build_path(target_x, target_y):
         """Construit un chemin simple en ligne droite: d'abord horizontal, puis vertical."""
@@ -104,24 +115,29 @@ init python:
         # Horizontal
         step_x = 1 if target_x > x else -1
         for nx in range(x + step_x, target_x + step_x, step_x):
-            path.append( (nx, y) )
+            path.append((nx, y))
 
         # Vertical
         step_y = 1 if target_y > y else -1
         for ny in range(y + step_y, target_y + step_y, step_y):
-            path.append( (target_x, ny) )
+            path.append((target_x, ny))
 
         return path
 
     def start_move_to(target_x, target_y):
         global moving, anim_current_step, anim_start_x, anim_start_y, anim_end_x, anim_end_y
         global hero_dir, selected_tile, movable_tiles, hero_tile_x, hero_tile_y, path
+        global hero_start_x, hero_start_y, show_confirm_menu
 
-        if moving:
+        if moving or not turn_active:
             return
 
         if (target_x, target_y) not in movable_tiles:
             return
+
+        # Sauvegarde position départ pour annulation possible
+        hero_start_x = hero_tile_x
+        hero_start_y = hero_tile_y
 
         path = build_path(target_x, target_y)
         if not path:
@@ -152,9 +168,11 @@ init python:
         selected_tile = None
         movable_tiles = []
 
+        show_confirm_menu = False
+
     def update_animation():
         global anim_current_step, moving, hero_tile_x, hero_tile_y, camera_x, camera_y
-        global anim_start_x, anim_start_y, anim_end_x, anim_end_y, path, hero_dir
+        global anim_start_x, anim_start_y, anim_end_x, anim_end_y, path, hero_dir, show_confirm_menu
 
         if not moving:
             return
@@ -190,12 +208,47 @@ init python:
                 anim_end_y = ny * TILE_SIZE
 
             else:
-                # Fin du déplacement complet
+                # Fin du déplacement complet => afficher menu confirmation
                 update_camera()
                 moving = False
                 anim_current_step = 0
+                show_confirm_menu = True
 
         renpy.restart_interaction()
+
+    def cancel_move():
+        global hero_tile_x, hero_tile_y, moving, show_confirm_menu
+        if moving:
+            return
+        hero_tile_x = hero_start_x
+        hero_tile_y = hero_start_y
+        update_camera()
+        show_confirm_menu = False
+
+    def confirm_move():
+        global turn_active, show_confirm_menu
+        turn_active = False
+        show_confirm_menu = False
+
+## --- Screen de confirmation modal ---
+screen confirm_move_menu():
+    modal True
+    frame:
+        xalign 0.5
+        yalign 0.5
+        xsize 400
+        ysize 200
+        background "#000000AA"
+        has vbox spacing 20
+
+        text "Valider votre déplacement ?" size 40 xalign 0.5
+
+        hbox:
+            spacing 50
+            textbutton "Oui" action [Function(confirm_move), Hide("confirm_move_menu")]
+            textbutton "Non" action [Function(cancel_move), Hide("confirm_move_menu")]
+
+    timer 5.0 action [Function(cancel_move), Hide("confirm_move_menu")]
 
 ## --- Screen combat_screen ---
 screen combat_screen():
@@ -210,19 +263,20 @@ screen combat_screen():
                 if tile_x < map_width_tiles and tile_y < map_height_tiles:
                     add "images/grid.png" xpos x * TILE_SIZE ypos y * TILE_SIZE
 
-        # Surlignage des cases accessibles si sélection en cours
-        for (tx, ty) in movable_tiles:
-            $ screen_x = int((tx - camera_x) * TILE_SIZE)
-            $ screen_y = int((ty - camera_y) * TILE_SIZE)
-            add Solid("#55FF0055") xpos screen_x ypos screen_y xsize TILE_SIZE ysize TILE_SIZE
+        # Surlignage des cases accessibles si sélection en cours et tour actif
+        if turn_active and not moving:
+            for (tx, ty) in movable_tiles:
+                $ screen_x = int((tx - camera_x) * TILE_SIZE)
+                $ screen_y = int((ty - camera_y) * TILE_SIZE)
+                add Solid("#55FF0055") xpos screen_x ypos screen_y xsize TILE_SIZE ysize TILE_SIZE
 
-            button:
-                xpos screen_x
-                ypos screen_y
-                xsize TILE_SIZE
-                ysize TILE_SIZE
-                action Function(start_move_to, tx, ty)
-                background None
+                button:
+                    xpos screen_x
+                    ypos screen_y
+                    xsize TILE_SIZE
+                    ysize TILE_SIZE
+                    action Function(start_move_to, tx, ty)
+                    background None
 
         # Position animée du héros si en déplacement
         if moving:
@@ -265,14 +319,18 @@ screen combat_screen():
 
     timer 0.02 repeat True action Function(update_animation)
 
-    # Clic sur héros pour afficher cases mouvables (si pas en déplacement)
+    # Clic sur héros pour afficher cases mouvables (si pas en déplacement et tour actif)
     button:
         xpos int((hero_tile_x - camera_x) * TILE_SIZE)
         ypos int((hero_tile_y - camera_y) * TILE_SIZE)
         xsize TILE_SIZE
         ysize TILE_SIZE
         background None
-        action If(moving == False, Function(calculate_and_show_moves))
+        action If(turn_active and not moving, Function(calculate_and_show_moves))
+        # Affiche le menu de confirmation modal quand nécessaire
+    if show_confirm_menu:
+        use confirm_move_menu
+    
 
 ## --- Menu démarrage ---
 screen start_menu():
