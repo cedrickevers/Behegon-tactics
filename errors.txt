@@ -2,9 +2,14 @@
 errors listed below, and try again.
 
 
-File "game/script.rpy", line 70: fixed expects a non-empty block.
-    fixed:
-          ^
+File "game/script.rpy", line 118: expected a keyword argument, colon, or end of line.
+    image ryugaru_sprite = ConditionSwitch(
+                         ^
+                "ryugaru_dir == 'down'", "ryugaru_down",
+                "ryugaru_dir == 'up'", "ryugaru_up",
+                "ryugaru_dir == 'left'", "ryugaru_left",
+                "ryugaru_dir == 'right'", "ryugaru_right"
+            )
 
 Ren'Py Version: Ren'Py 8.3.7.25031702
-Fri Jul 25 19:25:02 2025
+Fri Jul 25 20:42:32 2025

@@ -9,9 +9,15 @@ define TILE_COUNT_Y = 9
 default map_width_tiles  = 50
 default map_height_tiles = 30
 
+# Yoruah
 default hero_dir = "down"
 default hero_tile_x = map_width_tiles // 2
 default hero_tile_y = map_height_tiles // 2
+
+# Ryugaru
+default ryugaru_dir = "down"
+default ryugaru_tile_x = 37
+default ryugaru_tile_y = 15
 
 default camera_x = max(0, hero_tile_x - TILE_COUNT_X // 2)
 default camera_y = max(0, hero_tile_y - TILE_COUNT_Y // 2)
@@ -32,12 +38,18 @@ init:
     image ryugaru_left   = "images/ryugaru/ryugaru_left.png"
     image ryugaru_right  = "images/ryugaru/ryugaru_right.png"
 
-    # Pour l'instant, on affiche Yoruah par défaut
     image hero_sprite = ConditionSwitch(
         "hero_dir == 'down'",  "yoruah_down",
         "hero_dir == 'up'",    "yoruah_up",
         "hero_dir == 'left'",  "yoruah_left",
         "hero_dir == 'right'", "yoruah_right"
+    )
+
+    image ryugaru_sprite = ConditionSwitch(
+        "ryugaru_dir == 'down'", "ryugaru_down",
+        "ryugaru_dir == 'up'", "ryugaru_up",
+        "ryugaru_dir == 'left'", "ryugaru_left",
+        "ryugaru_dir == 'right'", "ryugaru_right"
     )
 
 ## --- Fonction mise à jour caméra ---
@@ -73,6 +85,30 @@ init python:
             # Met à jour la caméra après déplacement
             update_camera()
 
+## --- Fonction déplacer Ryugaru ---
+init python:
+    def move_ryugaru(dx, dy):
+        global ryugaru_tile_x, ryugaru_tile_y, ryugaru_dir
+        new_x = ryugaru_tile_x + dx
+        new_y = ryugaru_tile_y + dy
+
+        # Limite dans la map
+        if 0 <= new_x < map_width_tiles and 0 <= new_y < map_height_tiles:
+            ryugaru_tile_x = new_x
+            ryugaru_tile_y = new_y
+
+            # Mise à jour direction
+            if dx == 1:
+                ryugaru_dir = "right"
+            elif dx == -1:
+                ryugaru_dir = "left"
+            elif dy == 1:
+                ryugaru_dir = "down"
+            elif dy == -1:
+                ryugaru_dir = "up"
+
+            # Optionnel : ne pas bouger la caméra ici pour suivre Yoruah uniquement
+
 ## --- Menu de démarrage ---
 screen start_menu():
     tag menu
@@ -101,10 +137,15 @@ screen combat_screen():
                 if tile_x < map_width_tiles and tile_y < map_height_tiles:
                     add "images/grid.png" xpos x * TILE_SIZE ypos y * TILE_SIZE
 
-        # Héros au centre
+        # Yoruah au centre
         $ screen_x = (TILE_COUNT_X // 2) * TILE_SIZE
         $ screen_y = (TILE_COUNT_Y // 2) * TILE_SIZE
         add "hero_sprite" xpos screen_x ypos screen_y size (TILE_SIZE, TILE_SIZE)
+
+        # Ryugaru selon position relative à caméra
+        $ ryu_screen_x = (ryugaru_tile_x - camera_x) * TILE_SIZE
+        $ ryu_screen_y = (ryugaru_tile_y - camera_y) * TILE_SIZE
+        add "ryugaru_sprite" xpos ryu_screen_x ypos ryu_screen_y size (TILE_SIZE, TILE_SIZE)
 
         # Debug info
         frame:
@@ -144,10 +185,15 @@ screen deplacement_screen():
                 if tile_x < map_width_tiles and tile_y < map_height_tiles:
                     add "images/grid.png" xpos x * TILE_SIZE ypos y * TILE_SIZE
 
-        # Héros au centre
+        # Yoruah au centre
         $ screen_x = (TILE_COUNT_X // 2) * TILE_SIZE
         $ screen_y = (TILE_COUNT_Y // 2) * TILE_SIZE
         add "hero_sprite" xpos screen_x ypos screen_y size (TILE_SIZE, TILE_SIZE)
+
+        # Ryugaru selon position relative à caméra
+        $ ryu_screen_x = (ryugaru_tile_x - camera_x) * TILE_SIZE
+        $ ryu_screen_y = (ryugaru_tile_y - camera_y) * TILE_SIZE
+        add "ryugaru_sprite" xpos ryu_screen_x ypos ryu_screen_y size (TILE_SIZE, TILE_SIZE)
 
         # Debug info
         frame:
