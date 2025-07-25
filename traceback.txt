@@ -1,24 +1,20 @@
 ﻿I'm sorry, but an uncaught exception occurred.
 
 While running game code:
-  File "game/script.rpy", line 509, in script
+  File "game/script.rpy", line 518, in script
     call screen combat_screen
   File "renpy/common/000statements.rpy", line 671, in execute_call_screen
     store._return = renpy.call_screen(name, *args, **kwargs)
   File "renpy/common/00action_other.rpy", line 619, in __call__
     rv = self.callable(*self.args, **self.kwargs)
-  File "game/script.rpy", line 255, in confirm_move
+  File "game/script.rpy", line 257, in confirm_move
     start_ryugaru_move()
-  File "game/script.rpy", line 485, in start_ryugaru_move
-    start_move_ryu(dest_x, dest_y)  # <-- ici la fonction doit être définie au-dessus
-  File "game/script.rpy", line 445, in start_move_ryu
-    path_ryu = build_path(ryugaru_tile_x, ryugaru_tile_y, target_x, target_y)
-TypeError: build_path() takes 2 positional arguments but 4 were given
+NameError: name 'start_ryugaru_move' is not defined
 
 -- Full Traceback ------------------------------------------------------------
 
 Full traceback:
-  File "game/script.rpy", line 509, in script
+  File "game/script.rpy", line 518, in script
     call screen combat_screen
   File "D:\renpy-8.3.7-sdk\renpy\ast.py", line 1987, in execute
     self.call("execute")
@@ -64,15 +60,11 @@ Full traceback:
     return action(*args, **kwargs)
   File "renpy/common/00action_other.rpy", line 619, in __call__
     rv = self.callable(*self.args, **self.kwargs)
-  File "game/script.rpy", line 255, in confirm_move
+  File "game/script.rpy", line 257, in confirm_move
     start_ryugaru_move()
-  File "game/script.rpy", line 485, in start_ryugaru_move
-    start_move_ryu(dest_x, dest_y)  # <-- ici la fonction doit être définie au-dessus
-  File "game/script.rpy", line 445, in start_move_ryu
-    path_ryu = build_path(ryugaru_tile_x, ryugaru_tile_y, target_x, target_y)
-TypeError: build_path() takes 2 positional arguments but 4 were given
+NameError: name 'start_ryugaru_move' is not defined
 
 Windows-10-10.0.19045 AMD64
 Ren'Py 8.3.7.25031702
 Behegon tactics 1.0
-Sat Jul 26 00:40:33 2025
+Sat Jul 26 00:57:01 2025

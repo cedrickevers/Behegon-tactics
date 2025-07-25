@@ -2,9 +2,9 @@
 errors listed below, and try again.
 
 
-File "game/script.rpy", line 437: expected statement.
-    def start_move_ryu(target_x, target_y):
-                      ^
+File "game/script.rpy", line 248: expected statement.
+    def confirm_move():
+                    ^
 
 Ren'Py Version: Ren'Py 8.3.7.25031702
-Sat Jul 26 00:42:16 2025
+Sat Jul 26 00:52:27 2025
