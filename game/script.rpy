@@ -1,40 +1,32 @@
 ﻿# -*- coding: utf-8 -*-
 
-## --- Config ---
-define TILE_SIZE = 120
-define TILE_COUNT_X = 16
-define TILE_COUNT_Y = 9
+define TILE_SIZE = 64
+define TILE_COUNT_X = 10
+define TILE_COUNT_Y = 8
 
-## --- Variables ---
-default map_width_tiles  = 50
-default map_height_tiles = 30
+default map_width_tiles = 15
+default map_height_tiles = 12
 
-# Yoruah (joueur)
+default hero_tile_x = 2
+default hero_tile_y = 2
+default ryugaru_tile_x = 12
+default ryugaru_tile_y = 9
+
 default hero_dir = "down"
-default hero_tile_x = map_width_tiles // 2
-default hero_tile_y = map_height_tiles // 2
+default ryugaru_dir = "up"
 
-# Position de départ avant déplacement (pour annulation)
-default hero_start_x = hero_tile_x
-default hero_start_y = hero_tile_y
+default camera_x = 0
+default camera_y = 0
 
-# Ryugaru (PNJ)
-default ryugaru_dir = "down"
-default ryugaru_tile_x = 37
-default ryugaru_tile_y = 15
-
-# Caméra centrée sur Yoruah
-default camera_x = max(0, hero_tile_x - TILE_COUNT_X // 2)
-default camera_y = max(0, hero_tile_y - TILE_COUNT_Y // 2)
-
-# Déplacement actif (pour éviter inputs pendant animation)
 default moving = False
 default moving_ryu = False
 
-# Variables animation déplacement case par case
+default path = []
+default path_ryu = []
+
 default anim_current_step = 0
 default anim_current_step_ryu = 0
-define anim_steps = 10
+define anim_steps = 8
 
 default anim_start_x = 0
 default anim_start_y = 0
@@ -46,159 +38,231 @@ default anim_start_y_ryu = 0
 default anim_end_x_ryu = 0
 default anim_end_y_ryu = 0
 
-# Pour sélection des cases mouvables
-default selected_tile = None
-default movable_tiles = []
-
-# Liste des cases sur le chemin à parcourir (liste de tuples)
-default path = []
-default path_ryu = []
-
-# Etat du tour : True = déplacement possible, False = tour fini, plus de déplacements
+default current_turn = "hero"
 default turn_active = True
 
-# Qui joue actuellement: "hero" ou "ryugaru"
-default current_turn = "hero"
+default selection_mode = False
+default cursor_x = 0
+default cursor_y = 0
+default movable_tiles = []
 
-# Pour afficher le menu de confirmation après déplacement
-default show_confirm_menu = False
+default game_map = [
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,1,1,0,0,0,1,1,0,0,0,0,0,0],
+    [0,0,0,1,0,1,0,0,0,0,1,1,0,0,0],
+    [0,0,0,1,0,1,0,0,0,0,0,1,0,0,0],
+    [0,1,0,0,0,0,0,1,1,1,0,0,0,0,0],
+    [0,1,0,0,1,1,0,0,0,1,0,0,1,1,0],
+    [0,0,0,0,0,0,0,0,0,1,0,0,0,0,0],
+    [0,0,1,1,0,0,1,0,0,0,0,1,1,0,0],
+    [0,0,0,1,0,0,1,0,0,0,0,0,1,0,0],
+    [0,0,0,0,0,0,0,0,0,1,1,0,0,0,0],
+    [0,0,0,1,1,0,0,0,0,0,0,0,0,1,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+]
 
-
-## --- Images ---
-init:
-    image background_tile = "images/background_map.png"
-
-    # Sprites Yoruah
-    image yoruah_down   = "images/yoruah/yoruah_down.png"
-    image yoruah_up     = "images/yoruah/yoruah_up.png"
-    image yoruah_left   = "images/yoruah/yoruah_left.png"
-    image yoruah_right  = "images/yoruah/yoruah_right.png"
-
-    # Sprites Ryugaru
-    image ryugaru_down   = "images/ryugaru/ryugaru_down.png"
-    image ryugaru_up     = "images/ryugaru/ryugaru_up.png"
-    image ryugaru_left   = "images/ryugaru/ryugaru_left.png"
-    image ryugaru_right  = "images/ryugaru/ryugaru_right.png"
-
-    # Sprite Yoruah selon direction
-    image hero_sprite = ConditionSwitch(
-        "hero_dir == 'down'",  "yoruah_down",
-        "hero_dir == 'up'",    "yoruah_up",
-        "hero_dir == 'left'",  "yoruah_left",
-        "hero_dir == 'right'", "yoruah_right"
-    )
-
-    # Sprite Ryugaru selon direction
-    image ryugaru_sprite = ConditionSwitch(
-        "ryugaru_dir == 'down'", "ryugaru_down",
-        "ryugaru_dir == 'up'", "ryugaru_up",
-        "ryugaru_dir == 'left'", "ryugaru_left",
-        "ryugaru_dir == 'right'", "ryugaru_right"
-    )
-
-
-## --- Fonctions ---
 init python:
-    import renpy.exports as renpy
+    import heapq
+
+    def heuristic(a, b):
+        return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+    def neighbors(pos):
+        x, y = pos
+        results = []
+        for dx, dy in [(-1,0),(1,0),(0,-1),(0,1)]:
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < map_width_tiles and 0 <= ny < map_height_tiles:
+                if game_map[ny][nx] == 0:
+                    if (nx, ny) != (hero_tile_x, hero_tile_y) and (nx, ny) != (ryugaru_tile_x, ryugaru_tile_y):
+                        results.append((nx, ny))
+        return results
+
+    def astar(start, goal):
+        frontier = []
+        heapq.heappush(frontier, (0, start))
+        came_from = {}
+        cost_so_far = {}
+        came_from[start] = None
+        cost_so_far[start] = 0
+
+        while frontier:
+            _, current = heapq.heappop(frontier)
+            if current == goal:
+                break
+            for next_pos in neighbors(current):
+                new_cost = cost_so_far[current] + 1
+                if next_pos not in cost_so_far or new_cost < cost_so_far[next_pos]:
+                    cost_so_far[next_pos] = new_cost
+                    priority = new_cost + heuristic(goal, next_pos)
+                    heapq.heappush(frontier, (priority, next_pos))
+                    came_from[next_pos] = current
+
+        current = goal
+        path = []
+        while current != start:
+            if current not in came_from:
+                return []
+            path.append(current)
+            current = came_from[current]
+        path.reverse()
+        return path
 
     def update_camera():
         global camera_x, camera_y
         camera_x = max(0, min(map_width_tiles - TILE_COUNT_X, hero_tile_x - TILE_COUNT_X // 2))
         camera_y = max(0, min(map_height_tiles - TILE_COUNT_Y, hero_tile_y - TILE_COUNT_Y // 2))
 
-    def calculate_movable_tiles(radius=5):
-        global current_turn, turn_active, moving
-        tiles = []
-        if current_turn == "hero" and turn_active and not moving:
-            for dx in range(-radius, radius+1):
-                for dy in range(-radius, radius+1):
-                    tx = hero_tile_x + dx
-                    ty = hero_tile_y + dy
-                    if 0 <= tx < map_width_tiles and 0 <= ty < map_height_tiles:
-                        tiles.append((tx, ty))
-        return tiles
+    def start_move(character):
+        global moving, moving_ryu
+        global anim_current_step, anim_current_step_ryu
+        global anim_start_x, anim_start_y, anim_end_x, anim_end_y
+        global anim_start_x_ryu, anim_start_y_ryu, anim_end_x_ryu, anim_end_y_ryu
+        global path, path_ryu
+        global hero_dir, ryugaru_dir
+        global hero_tile_x, hero_tile_y, ryugaru_tile_x, ryugaru_tile_y
 
-    def calculate_and_show_moves():
-        global movable_tiles
-        movable_tiles = calculate_movable_tiles(5)
-
-    def build_path(start_x, start_y, target_x, target_y):
-        path = []
-        # Horizontal
-        step_x = 1 if target_x > start_x else -1
-        for nx in range(start_x + step_x, target_x + step_x, step_x):
-            path.append((nx, start_y))
-        # Vertical
-        step_y = 1 if target_y > start_y else -1
-        for ny in range(start_y + step_y, target_y + step_y, step_y):
-            path.append((target_x, ny))
-        return path
-
-    def start_move_to(target_x, target_y):
-        global moving, anim_current_step, anim_start_x, anim_start_y, anim_end_x, anim_end_y
-        global hero_dir, selected_tile, movable_tiles, hero_tile_x, hero_tile_y, path
-        global hero_start_x, hero_start_y, show_confirm_menu, current_turn, turn_active
-
-        if moving or not turn_active or current_turn != "hero":
-            return
-
-        if (target_x, target_y) not in movable_tiles:
-            return
-
-        # Sauvegarde position départ pour annulation possible
-        hero_start_x = hero_tile_x
-        hero_start_y = hero_tile_y
-
-        path = build_path(hero_tile_x, hero_tile_y, target_x, target_y)
-        if not path:
-            return
-
-        next_tile = path.pop(0)
-        nx, ny = next_tile
-        dx = nx - hero_tile_x
-        dy = ny - hero_tile_y
-
-        if dx > 0:
-            hero_dir = "right"
-        elif dx < 0:
-            hero_dir = "left"
-        elif dy > 0:
-            hero_dir = "down"
-        elif dy < 0:
-            hero_dir = "up"
-
-        moving = True
-        anim_current_step = 0
-        anim_start_x = hero_tile_x * TILE_SIZE
-        anim_start_y = hero_tile_y * TILE_SIZE
-        anim_end_x = nx * TILE_SIZE
-        anim_end_y = ny * TILE_SIZE
-
-        selected_tile = None
-        movable_tiles = []
-
-        show_confirm_menu = False
+        if character == "hero":
+            if moving or not turn_active or current_turn != "hero":
+                return
+            if not path:
+                return
+            next_tile = path.pop(0)
+            nx, ny = next_tile
+            dx = nx - hero_tile_x
+            dy = ny - hero_tile_y
+            if dx > 0:
+                hero_dir = "right"
+            elif dx < 0:
+                hero_dir = "left"
+            elif dy > 0:
+                hero_dir = "down"
+            elif dy < 0:
+                hero_dir = "up"
+            anim_current_step = 0
+            anim_start_x = hero_tile_x * TILE_SIZE
+            anim_start_y = hero_tile_y * TILE_SIZE
+            anim_end_x = nx * TILE_SIZE
+            anim_end_y = ny * TILE_SIZE
+            moving = True
+        elif character == "ryugaru":
+            if moving_ryu or turn_active or current_turn != "ryugaru":
+                return
+            if not path_ryu:
+                return
+            next_tile = path_ryu.pop(0)
+            nx, ny = next_tile
+            dx = nx - ryugaru_tile_x
+            dy = ny - ryugaru_tile_y
+            if dx > 0:
+                ryugaru_dir = "right"
+            elif dx < 0:
+                ryugaru_dir = "left"
+            elif dy > 0:
+                ryugaru_dir = "down"
+            elif dy < 0:
+                ryugaru_dir = "up"
+            anim_current_step_ryu = 0
+            anim_start_x_ryu = ryugaru_tile_x * TILE_SIZE
+            anim_start_y_ryu = ryugaru_tile_y * TILE_SIZE
+            anim_end_x_ryu = nx * TILE_SIZE
+            anim_end_y_ryu = ny * TILE_SIZE
+            moving_ryu = True
 
     def update_animation():
-        global anim_current_step, moving, hero_tile_x, hero_tile_y, camera_x, camera_y
-        global anim_start_x, anim_start_y, anim_end_x, anim_end_y, path, hero_dir, show_confirm_menu
+        global anim_current_step, moving
+        global hero_tile_x, hero_tile_y
+        global anim_start_x, anim_start_y, anim_end_x, anim_end_y
+        global path, current_turn, turn_active
 
         if not moving:
             return
 
         anim_current_step += 1
-
         if anim_current_step >= anim_steps:
             hero_tile_x = anim_end_x // TILE_SIZE
             hero_tile_y = anim_end_y // TILE_SIZE
+            update_camera()
 
             if path:
-                next_tile = path.pop(0)
-                nx, ny = next_tile
+                start_move("hero")
+            else:
+                moving = False
+                turn_active = False
+                current_turn = "ryugaru"
+                start_ryugaru_move()
 
-                dx = nx - hero_tile_x
-                dy = ny - hero_tile_y
+        renpy.restart_interaction()
 
+    def update_animation_ryu():
+        global anim_current_step_ryu, moving_ryu
+        global ryugaru_tile_x, ryugaru_tile_y
+        global anim_start_x_ryu, anim_start_y_ryu, anim_end_x_ryu, anim_end_y_ryu
+        global path_ryu, current_turn, turn_active
+
+        if not moving_ryu:
+            return
+
+        anim_current_step_ryu += 1
+        if anim_current_step_ryu >= anim_steps:
+            ryugaru_tile_x = anim_end_x_ryu // TILE_SIZE
+            ryugaru_tile_y = anim_end_y_ryu // TILE_SIZE
+            update_camera()
+
+            if path_ryu:
+                start_move("ryugaru")
+            else:
+                moving_ryu = False
+                turn_active = True
+                current_turn = "hero"
+
+        renpy.restart_interaction()
+
+    def calculate_movable_tiles(character, max_range=5):
+        if character == "hero":
+            start = (hero_tile_x, hero_tile_y)
+        else:
+            start = (ryugaru_tile_x, ryugaru_tile_y)
+
+        reachable = []
+
+        for y in range(map_height_tiles):
+            for x in range(map_width_tiles):
+                if game_map[y][x] == 0:
+                    dist = abs(x - start[0]) + abs(y - start[1])
+                    if dist <= max_range:
+                        path_tmp = astar(start, (x,y))
+                        if path_tmp:
+                            reachable.append((x,y))
+
+        return reachable
+
+    def start_ryugaru_move():
+        global path_ryu
+        start = (ryugaru_tile_x, ryugaru_tile_y)
+        goal = (hero_tile_x, hero_tile_y)
+
+        path_tmp = astar(start, goal)
+
+        if path_tmp:
+            path_ryu = path_tmp[:5]
+            start_move("ryugaru")
+        else:
+            global current_turn, turn_active
+            current_turn = "hero"
+            turn_active = True
+
+    def move_hero(dx, dy):
+        global hero_tile_x, hero_tile_y, hero_dir, path, moving
+        if moving or not turn_active or current_turn != "hero" or selection_mode:
+            return
+
+        new_x = hero_tile_x + dx
+        new_y = hero_tile_y + dy
+
+        if 0 <= new_x < map_width_tiles and 0 <= new_y < map_height_tiles:
+            if game_map[new_y][new_x] == 0 and (new_x, new_y) != (ryugaru_tile_x, ryugaru_tile_y):
+                # Définir la direction en fonction du déplacement
                 if dx > 0:
                     hero_dir = "right"
                 elif dx < 0:
@@ -207,185 +271,37 @@ init python:
                     hero_dir = "down"
                 elif dy < 0:
                     hero_dir = "up"
+                # Créer un chemin simple d'une case pour le déplacement animé
+                path = [(new_x, new_y)]
+                start_move("hero")
 
-                anim_current_step = 0
-                anim_start_x = hero_tile_x * TILE_SIZE
-                anim_start_y = hero_tile_y * TILE_SIZE
-                anim_end_x = nx * TILE_SIZE
-                anim_end_y = ny * TILE_SIZE
+init:
+    image background_tile = "background_tile.png"
+    image hero = "hero.png"
+    image ryugaru = "ryugaru.png"
+    image cursor = Solid("#FFFF0055")
 
-            else:
-                update_camera()
-                moving = False
-                anim_current_step = 0
-                show_confirm_menu = True
-
-        renpy.restart_interaction()
-
-    def cancel_move():
-        global hero_tile_x, hero_tile_y, moving, show_confirm_menu
-        if moving:
-            return
-        hero_tile_x = hero_start_x
-        hero_tile_y = hero_start_y
-        update_camera()
-        show_confirm_menu = False
-
-    def confirm_move():
-        global turn_active, show_confirm_menu, current_turn
-        turn_active = False
-        show_confirm_menu = False
-        current_turn = "ryugaru"
-        start_ryugaru_move()
-
-    def update_animation_ryu():
-        global anim_current_step_ryu, moving_ryu, ryugaru_tile_x, ryugaru_tile_y
-        global anim_start_x_ryu, anim_start_y_ryu, anim_end_x_ryu, anim_end_y_ryu, path_ryu, ryugaru_dir
-        global current_turn, turn_active
-
-        if not moving_ryu:
-            return
-
-        anim_current_step_ryu += 1
-
-        if anim_current_step_ryu >= anim_steps:
-            ryugaru_tile_x = anim_end_x_ryu // TILE_SIZE
-            ryugaru_tile_y = anim_end_y_ryu // TILE_SIZE
-
-            if path_ryu:
-                next_tile = path_ryu.pop(0)
-                nx, ny = next_tile
-
-                dx = nx - ryugaru_tile_x
-                dy = ny - ryugaru_tile_y
-
-                if dx > 0:
-                    ryugaru_dir = "right"
-                elif dx < 0:
-                    ryugaru_dir = "left"
-                elif dy > 0:
-                    ryugaru_dir = "down"
-                elif dy < 0:
-                    ryugaru_dir = "up"
-
-                anim_current_step_ryu = 0
-                anim_start_x_ryu = ryugaru_tile_x * TILE_SIZE
-                anim_start_y_ryu = ryugaru_tile_y * TILE_SIZE
-                anim_end_x_ryu = nx * TILE_SIZE
-                anim_end_y_ryu = ny * TILE_SIZE
-
-            else:
-                moving_ryu = False
-                anim_current_step_ryu = 0
-
-                # Fin du tour Ryugaru, passage au héros
-                current_turn = "hero"
-                turn_active = True
-
-        renpy.restart_interaction()
-
-    def start_move_ryu(target_x, target_y):
-        global moving_ryu, anim_current_step_ryu, anim_start_x_ryu, anim_start_y_ryu, anim_end_x_ryu, anim_end_y_ryu
-        global ryugaru_dir, ryugaru_tile_x, ryugaru_tile_y, path_ryu
-
-        if moving_ryu:
-            return
-
-        path_ryu = build_path(ryugaru_tile_x, ryugaru_tile_y, target_x, target_y)
-        if not path_ryu:
-            return
-
-        next_tile = path_ryu.pop(0)
-        nx, ny = next_tile
-        dx = nx - ryugaru_tile_x
-        dy = ny - ryugaru_tile_y
-
-        if dx > 0:
-            ryugaru_dir = "right"
-        elif dx < 0:
-            ryugaru_dir = "left"
-        elif dy > 0:
-            ryugaru_dir = "down"
-        elif dy < 0:
-            ryugaru_dir = "up"
-
-        moving_ryu = True
-        anim_current_step_ryu = 0
-        anim_start_x_ryu = ryugaru_tile_x * TILE_SIZE
-        anim_start_y_ryu = ryugaru_tile_y * TILE_SIZE
-        anim_end_x_ryu = nx * TILE_SIZE
-        anim_end_y_ryu = ny * TILE_SIZE
-
-    def start_ryugaru_move():
-        global turn_active
-
-        max_move = 5
-
-        dx = hero_tile_x - ryugaru_tile_x
-        dy = hero_tile_y - ryugaru_tile_y
-
-        # Limite le déplacement de Ryugaru à max_move cases (Manhattan)
-        move_x = max(-max_move, min(dx, max_move))
-        move_y = max(-max_move, min(dy, max_move))
-
-        dest_x = ryugaru_tile_x + move_x
-        dest_y = ryugaru_tile_y + move_y
-
-        start_move_ryu(dest_x, dest_y)
-
-        turn_active = False
-
-
-## --- Screen de confirmation modal ---
-screen confirm_move_menu():
-    modal True
-    frame:
-        xalign 0.5
-        yalign 0.5
-        xsize 400
-        ysize 200
-        background "#000000AA"
-        has vbox spacing 20
-
-        text "Valider votre déplacement ?" size 40 xalign 0.5
-
-        hbox:
-            spacing 50
-            textbutton "Oui" action [Function(confirm_move), Hide("confirm_move_menu")]
-            textbutton "Non" action [Function(cancel_move), Hide("confirm_move_menu")]
-
-    timer 5.0 action [Function(cancel_move), Hide("confirm_move_menu")]
-
-
-## --- Screen combat ---
 screen combat_screen():
+
+    key "K_UP" action Function(move_hero, 0, -1)
+    key "K_DOWN" action Function(move_hero, 0, 1)
+    key "K_LEFT" action Function(move_hero, -1, 0)
+    key "K_RIGHT" action Function(move_hero, 1, 0)
+    key "K_ESCAPE" action SetVariable("selection_mode", False)
+
     fixed:
-        add "background_tile" xpos -camera_x * TILE_SIZE ypos -camera_y * TILE_SIZE xysize (map_width_tiles * TILE_SIZE, map_height_tiles * TILE_SIZE)
-
-        # Grille visible
-        for x in range(TILE_COUNT_X + 1):
-            for y in range(TILE_COUNT_Y + 1):
-                $ tile_x = int(camera_x) + x
-                $ tile_y = int(camera_y) + y
+        # Affichage map et obstacles
+        for x in range(TILE_COUNT_X):
+            for y in range(TILE_COUNT_Y):
+                $ tile_x = camera_x + x
+                $ tile_y = camera_y + y
                 if tile_x < map_width_tiles and tile_y < map_height_tiles:
-                    add "images/grid.png" xpos x * TILE_SIZE ypos y * TILE_SIZE
+                    if game_map[tile_y][tile_x] == 1:
+                        add Solid("#444444") xpos x * TILE_SIZE ypos y * TILE_SIZE xsize TILE_SIZE ysize TILE_SIZE
+                    else:
+                        add Solid("#AAAAAA") xpos x * TILE_SIZE ypos y * TILE_SIZE xsize TILE_SIZE ysize TILE_SIZE
 
-        # Surlignage des cases accessibles si sélection en cours, tour actif et tour héros
-        if current_turn == "hero" and turn_active and not moving:
-            for (tx, ty) in movable_tiles:
-                $ screen_x = int((tx - camera_x) * TILE_SIZE)
-                $ screen_y = int((ty - camera_y) * TILE_SIZE)
-                add Solid("#55FF0055") xpos screen_x ypos screen_y xsize TILE_SIZE ysize TILE_SIZE
-
-                button:
-                    xpos screen_x
-                    ypos screen_y
-                    xsize TILE_SIZE
-                    ysize TILE_SIZE
-                    action Function(start_move_to, tx, ty)
-                    background None
-
-        # Position animée du héros si en déplacement
+        # Position animée héros
         if moving:
             $ interp_x = anim_start_x + (anim_end_x - anim_start_x) * anim_current_step / anim_steps
             $ interp_y = anim_start_y + (anim_end_y - anim_start_y) * anim_current_step / anim_steps
@@ -395,9 +311,9 @@ screen combat_screen():
             $ screen_x = int((hero_tile_x - camera_x) * TILE_SIZE)
             $ screen_y = int((hero_tile_y - camera_y) * TILE_SIZE)
 
-        add "hero_sprite" xpos screen_x ypos screen_y size (TILE_SIZE, TILE_SIZE)
+        add "hero" xpos screen_x ypos screen_y size (TILE_SIZE, TILE_SIZE)
 
-        # Position animée de Ryugaru si en déplacement
+        # Position animée Ryugaru
         if moving_ryu:
             $ interp_x_ryu = anim_start_x_ryu + (anim_end_x_ryu - anim_start_x_ryu) * anim_current_step_ryu / anim_steps
             $ interp_y_ryu = anim_start_y_ryu + (anim_end_y_ryu - anim_start_y_ryu) * anim_current_step_ryu / anim_steps
@@ -407,75 +323,32 @@ screen combat_screen():
             $ ryu_screen_x = int((ryugaru_tile_x - camera_x) * TILE_SIZE)
             $ ryu_screen_y = int((ryugaru_tile_y - camera_y) * TILE_SIZE)
 
-        add "ryugaru_sprite" xpos ryu_screen_x ypos ryu_screen_y size (TILE_SIZE, TILE_SIZE)
+        add "ryugaru" xpos ryu_screen_x ypos ryu_screen_y size (TILE_SIZE, TILE_SIZE)
 
         # Debug info
         frame:
-            background "#87CEEB80"
-            xpadding 20
-            ypadding 10
-            xpos 10 ypos 10
-            text "Hero Pos: ([hero_tile_x], [hero_tile_y])" size 30 color "#000000"
+            background "#FFFFFF80"
+            xpadding 10
+            ypadding 5
+            xpos 10
+            ypos 10
+            text "Tour: [current_turn]" size 20 color "#000000"
 
-        frame:
-            background "#87CEEB80"
-            xpadding 20
-            ypadding 10
-            xpos 10 ypos 50
-            text "Hero Dir: [hero_dir]" size 30 color "#000000"
-
-        frame:
-            background "#87CEEB80"
-            xpadding 20
-            ypadding 10
-            xpos 10 ypos 90
-            text "Moving: [moving]" size 30 color "#000000"
-
-        frame:
-            background "#87CEEB80"
-            xpadding 20
-            ypadding 10
-            xpos 10 ypos 130
-            text "Ryugaru Moving: [moving_ryu]" size 30 color "#000000"
-
-    timer 0.02 repeat True action [Function(update_animation), Function(update_animation_ryu)]
-
-    # Clic sur héros pour afficher cases mouvables (si tour héros, actif et pas en déplacement)
-    button:
-        xpos int((hero_tile_x - camera_x) * TILE_SIZE)
-        ypos int((hero_tile_y - camera_y) * TILE_SIZE)
-        xsize TILE_SIZE
-        ysize TILE_SIZE
-        background None
-        action If(current_turn == "hero" and turn_active and not moving, Function(calculate_and_show_moves))
-
-    # Affiche le menu de confirmation modal quand nécessaire
-    if show_confirm_menu:
-        use confirm_move_menu
+    timer 0.03 repeat True action [Function(update_animation), Function(update_animation_ryu)]
 
 
-## --- Menu démarrage ---
-screen start_menu():
-    tag menu
-    frame:
-        xalign 0.5
-        yalign 0.5
-        has vbox spacing 20
+init python:
+    def end_hero_turn():
+        global current_turn, turn_active, moving, path
+        if moving:
+            return
+        path = []
+        turn_active = False
+        current_turn = "ryugaru"
+        start_ryugaru_move()
 
-        text "Que voulez-vous faire ?" xalign 0.5 size 50
-
-        textbutton "Combat" action Jump("combat")
-        textbutton "Déplacement" action Jump("deplacement")
-
-## --- Labels ---
 label start:
-    call screen start_menu
-    return
-
-label combat:
-    call screen combat_screen
-    return
-
-label deplacement:
-    call screen combat_screen
+    scene black
+    show screen combat_screen
+    "Tour par tour avec déplacement au clavier."
     return
