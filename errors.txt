@@ -2,9 +2,15 @@
 errors listed below, and try again.
 
 
-File "game/script.rpy", line 303: reached end of line when expecting ':'.
-    if current_turn ==
-                      ^
+File "game/script.rpy", line 273: 'ix' is not a keyword argument or valid child of the for statement.
+    ix = hu['anim_start'][0] + (hu['anim_end'][0] - hu['anim_start'][0]) * hu['anim_step'] / 8
+      ^
+
+File "game/script.rpy", line 285: end of line expected.
+    "Tour par tour simplifié.\nAppuyez sur TAB pour entrer/sortir du mode sélection.\n"\
+        "Utilisez les flèches pour déplacer le curseur (mode sélection) ou le héros (mode normal).\n"\
+        "Validez avec ENTER pour déplacer le héros vers la case sélectionnée.\n"
+          ^
 
 Ren'Py Version: Ren'Py 8.3.7.25031702
-Sat Jul 26 11:35:11 2025
+Mon Jul 28 02:20:28 2025
